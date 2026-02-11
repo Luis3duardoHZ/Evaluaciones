@@ -31,10 +31,7 @@ const LiquidacionForm = () => {
 
   const guardarEvaluacion = (nueva) => {
     const actuales = obtenerEvaluaciones();
-    localStorage.setItem(
-      "evaluaciones",
-      JSON.stringify([...actuales, nueva])
-    );
+    localStorage.setItem("evaluaciones", JSON.stringify([...actuales, nueva]));
   };
 
   const handleSubmit = (e) => {
@@ -63,28 +60,27 @@ const LiquidacionForm = () => {
     let clausula = "";
     let multiplicadorNormal = 0;
     let multiplicadorRiesgo = 0;
-    let cumpleNormal = false;
 
     if (!tieneAval) {
       multiplicadorNormal = 3;
       multiplicadorRiesgo = 2.5;
       evaluacion = ratioTitular >= multiplicadorNormal ? "APROBADO" : "RECHAZADO";
-      cumpleNormal = ratioTitular >= multiplicadorNormal;
-      clausula = cumpleNormal
-        ? ""
-        : ratioTitular >= multiplicadorRiesgo
-        ? "Aprobado con cláusula de riesgo"
-        : "No cumple ni con cláusula de riesgo";
+      clausula =
+        ratioTitular >= multiplicadorNormal
+          ? ""
+          : ratioTitular >= multiplicadorRiesgo
+          ? "Aprobado con cláusula de riesgo"
+          : "No cumple ni con cláusula de riesgo";
     } else {
       multiplicadorNormal = 4;
       multiplicadorRiesgo = 3;
       evaluacion = ratioTotal >= multiplicadorNormal ? "APROBADO" : "RECHAZADO";
-      cumpleNormal = ratioTotal >= multiplicadorNormal;
-      clausula = cumpleNormal
-        ? ""
-        : ratioTotal >= multiplicadorRiesgo
-        ? "Aprobado con cláusula de riesgo"
-        : "No cumple ni con cláusula de riesgo";
+      clausula =
+        ratioTotal >= multiplicadorNormal
+          ? ""
+          : ratioTotal >= multiplicadorRiesgo
+          ? "Aprobado con cláusula de riesgo"
+          : "No cumple ni con cláusula de riesgo";
     }
 
     const montoRequeridoNormal = canon * multiplicadorNormal;
@@ -133,30 +129,6 @@ const LiquidacionForm = () => {
     const azul = [0, 31, 84];
     const amarillo = [255, 204, 0];
     const rojo = [214, 40, 40];
-    const verde = [0, 128, 0];
-
-    const ingresoTotal =
-      Number(resultadoFinal.promedioTitular) +
-      Number(resultadoFinal.promedioAval || 0);
-
-    const operacionPromedioTitular = `(${liq1} + ${liq2} + ${liq3}) / 3 = ${resultadoFinal.promedioTitular}`;
-
-    const operacionPromedioAval = tieneAval
-      ? `(${liqAval1} + ${liqAval2} + ${liqAval3}) / 3 = ${resultadoFinal.promedioAval}`
-      : null;
-
-    let estadoTexto = resultadoFinal.evaluacion;
-    let colorEstado = rojo;
-
-    if (resultadoFinal.evaluacion === "APROBADO") {
-      estadoTexto = "APROBADO";
-      colorEstado = verde;
-    }
-
-    if (resultadoFinal.clausula === "Aprobado con cláusula de riesgo") {
-      estadoTexto = "APROBADO CON CLÁUSULA DE RIESGO";
-      colorEstado = amarillo;
-    }
 
     doc.setFillColor(...azul);
     doc.rect(10, 10, 190, 20, "F");
@@ -164,92 +136,61 @@ const LiquidacionForm = () => {
     doc.setTextColor(...amarillo);
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("INFORME DE EVALUACIÓN - PLUS ULTRA", 15, 23);
+    doc.text("INFORME DE EVALUACIÓN - PLUS ULTRA", 15, 25);
 
-    doc.rect(160, 12, 30, 16);
+    y += 20;
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(12);
 
-    y = 40;
+    const estadoVisual =
+      resultadoFinal.evaluacion === "APROBADO"
+        ? "🟢 APROBADO"
+        : resultadoFinal.clausula === "Aprobado con cláusula de riesgo"
+        ? "🟡 APROBADO CON CLÁUSULA DE RIESGO"
+        : "🔴 RECHAZADO";
 
-    doc.setDrawColor(...azul);
-    doc.rect(10, y - 10, 190, 200);
+    const observacion =
+      resultadoFinal.evaluacion === "APROBADO"
+        ? "Cumple con la política normal exigida."
+        : resultadoFinal.clausula === "Aprobado con cláusula de riesgo"
+        ? "El postulante no alcanza la política normal, pero cumple el monto exigido bajo cláusula de riesgo."
+        : "No cumple con los requisitos mínimos exigidos.";
 
-    const filas = [
+    const info = [
       ["RUT", resultadoFinal.rut],
       ["Postulante", resultadoFinal.postulante],
       ["Nombre Corredor", resultadoFinal.nombreCorredor],
       ["Dirección", resultadoFinal.direccion],
       ["PID", resultadoFinal.pid],
-      ["Canon", `$${Number(resultadoFinal.canon).toLocaleString()}`],
-      ["Política aplicada", resultadoFinal.multiplicadorNormal],
-      ["Monto requerido normal", `$${Number(resultadoFinal.montoRequeridoNormal).toLocaleString()}`],
-      ["Monto requerido cláusula", `$${Number(resultadoFinal.montoRequeridoRiesgo).toLocaleString()}`],
-      ["Ingresos declarados", `$${ingresoTotal.toLocaleString()}`],
-      ["Diferencia", `${resultadoFinal.diferencia >= 0 ? "+" : ""}$${Number(resultadoFinal.diferencia).toLocaleString()}`],
-      ["Resultado final", estadoTexto],
-      ["Nombre Aval", resultadoFinal.nombreAval || "N/A"],
-      ["RUT Aval", resultadoFinal.rutAval || "N/A"],
-      ["Fecha", resultadoFinal.fecha],
+      ["Canon", `$${resultadoFinal.canon}`],
+      ["Promedio Titular", `$${resultadoFinal.promedioTitular}`],
+      ["Promedio Aval", `$${resultadoFinal.promedioAval}`],
+      ["Monto requerido normal", `$${resultadoFinal.montoRequeridoNormal}`],
+      ["Monto requerido cláusula", `$${resultadoFinal.montoRequeridoRiesgo}`],
+      ["Diferencia", `$${resultadoFinal.diferencia}`],
     ];
 
-    filas.forEach(([label, value]) => {
+    info.forEach(([label, value]) => {
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(...azul);
-      doc.text(label, 15, y);
-
+      doc.text(`${label}:`, 15, y);
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(label === "Resultado final" ? colorEstado : [0,0,0]);
-      doc.text(String(value), 80, y);
+      doc.text(`${value}`, 80, y);
       y += 8;
     });
 
-    y += 5;
-
+    y += 10;
+    doc.setTextColor(...rojo);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(...azul);
-    doc.text("Detalle Cálculo Promedios:", 15, y);
+    doc.text("📊 RESULTADO", 15, y);
     y += 8;
 
-    doc.setFont("helvetica", "normal");
     doc.setTextColor(0, 0, 0);
-    doc.text(`Titular: ${operacionPromedioTitular}`, 15, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Estado: ${estadoVisual}`, 15, y);
     y += 8;
-
-    if (operacionPromedioAval) {
-      doc.text(`Aval: ${operacionPromedioAval}`, 15, y);
-    }
+    doc.text(`Observación: ${observacion}`, 15, y);
 
     doc.save(`Evaluacion_${resultadoFinal.rut}.pdf`);
-  };
-
-  const respaldarJSON = () => {
-    const evaluaciones = obtenerEvaluaciones();
-    const json = JSON.stringify(evaluaciones, null, 2);
-    setJsonBackup(json);
-
-    const blob = new Blob([json], { type: "application/json" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "evaluaciones_backup.json";
-    link.click();
-  };
-
-  const restaurarJSONArchivo = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const jsonData = event.target.result;
-      localStorage.setItem("evaluaciones", jsonData);
-      const restauradas = JSON.parse(jsonData);
-      if (restauradas.length > 0) {
-        setResultadoFinal(restauradas[restauradas.length - 1]);
-      } else {
-        setResultadoFinal(null);
-      }
-      setJsonBackup(jsonData);
-      alert("✅ JSON restaurado en localStorage y pantalla actualizada");
-    };
-    reader.readAsText(file);
   };
 
   const borrarTodo = () => {
@@ -278,8 +219,6 @@ const LiquidacionForm = () => {
           <button onClick={generarPDF}>Descargar PDF</button>
           <button onClick={generarExcel}>Descargar Excel</button>
           <button onClick={nuevaEvaluacion}>Nueva Evaluación</button>
-          <button onClick={respaldarJSON}>Respaldar JSON</button>
-          <input type="file" accept=".json" onChange={restaurarJSONArchivo} />
           <button onClick={borrarTodo}>Borrar Todas las Evaluaciones</button>
         </div>
       </div>
@@ -295,8 +234,6 @@ const LiquidacionForm = () => {
 
       <div className="button-group" style={{ justifyContent: "flex-end", marginBottom: "10px" }}>
         <button onClick={generarExcel}>Descargar Excel</button>
-        <button onClick={respaldarJSON}>Respaldar JSON</button>
-        <input type="file" accept=".json" onChange={restaurarJSONArchivo} />
         <button onClick={borrarTodo}>Borrar Todas las Evaluaciones</button>
       </div>
 
