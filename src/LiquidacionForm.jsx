@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 
@@ -15,14 +15,15 @@ const LiquidacionForm = () => {
   const [liq3, setLiq3] = useState("");
 
   const [tieneAval, setTieneAval] = useState(false);
-  const [avalRut, setAvalRut] = useState("");
-  const [avalNombre, setAvalNombre] = useState("");
   const [liqAval1, setLiqAval1] = useState("");
   const [liqAval2, setLiqAval2] = useState("");
   const [liqAval3, setLiqAval3] = useState("");
+  const [nombreAval, setNombreAval] = useState("");
+  const [rutAval, setRutAval] = useState("");
 
-  const [clausulaActiva, setClausulaActiva] = useState(false);
   const [resultadoFinal, setResultadoFinal] = useState(null);
+
+  const [jsonBackup, setJsonBackup] = useState("");
 
   const obtenerEvaluaciones = () => {
     const data = localStorage.getItem("evaluaciones");
@@ -50,26 +51,53 @@ const LiquidacionForm = () => {
       (Number(liq1) + Number(liq2) + Number(liq3)) / 3;
 
     let promedioAval = 0;
+
     if (tieneAval) {
       promedioAval =
         (Number(liqAval1) + Number(liqAval2) + Number(liqAval3)) / 3;
     }
 
     const ingresoTotal = promedioTitular + promedioAval;
+
     const ratioTitular = promedioTitular / Number(canon);
     const ratioTotal = ingresoTotal / Number(canon);
 
-    let multiplicadorNormal = tieneAval ? 4 : 3;
-    let cumpleNormal = (tieneAval ? ratioTotal : ratioTitular) >= multiplicadorNormal;
+    let evaluacion = "";
+    let clausula = "";
+    let multiplicadorNormal = 0;
+    let multiplicadorRiesgo = 0;
 
-    let multiplicadorClausula = tieneAval ? 3 : 2.5;
-    let montoRequeridoNormal = Number(canon) * multiplicadorNormal;
-    let montoRequeridoClausula = Number(canon) * multiplicadorClausula;
+    let cumpleNormal = false;
 
+    if (!tieneAval) {
+      multiplicadorNormal = 3;
+      multiplicadorRiesgo = 2.5;
+
+      evaluacion = ratioTitular >= multiplicadorNormal ? "APROBADO" : "RECHAZADO";
+      cumpleNormal = ratioTitular >= multiplicadorNormal;
+
+      clausula = cumpleNormal
+        ? ""
+        : ratioTitular >= multiplicadorRiesgo
+        ? "Aprobado con cláusula de riesgo"
+        : "No cumple ni con cláusula de riesgo";
+    } else {
+      multiplicadorNormal = 4;
+      multiplicadorRiesgo = 3;
+
+      evaluacion = ratioTotal >= multiplicadorNormal ? "APROBADO" : "RECHAZADO";
+      cumpleNormal = ratioTotal >= multiplicadorNormal;
+
+      clausula = cumpleNormal
+        ? ""
+        : ratioTotal >= multiplicadorRiesgo
+        ? "Aprobado con cláusula de riesgo"
+        : "No cumple ni con cláusula de riesgo";
+    }
+
+    const montoRequeridoNormal = canon * multiplicadorNormal;
+    const montoRequeridoRiesgo = canon * multiplicadorRiesgo;
     const diferencia = ingresoTotal - montoRequeridoNormal;
-    const diferenciaStr = diferencia >= 0 ? `+$${diferencia.toFixed(0)}` : `-$${Math.abs(diferencia).toFixed(0)}`;
-
-    let resultado = cumpleNormal ? "APROBADO" : "NO CUMPLE";
 
     const nuevaEvaluacion = {
       rut,
@@ -83,39 +111,20 @@ const LiquidacionForm = () => {
       ratioTitular: ratioTitular.toFixed(2),
       ratioTotal: ratioTotal.toFixed(2),
       multiplicadorNormal: `x${multiplicadorNormal}`,
-      multiplicadorClausula: `x${multiplicadorClausula}`,
-      cumpleNormal,
-      cumpleClausula: false,
+      multiplicadorRiesgo: `x${multiplicadorRiesgo}`,
       montoRequeridoNormal,
-      montoRequeridoClausula,
-      diferencia: diferenciaStr,
-      resultado,
-      avalRut,
-      avalNombre,
+      montoRequeridoRiesgo,
+      diferencia,
+      evaluacion,
+      clausula,
+      nombreAval,
+      rutAval,
       fecha: new Date().toLocaleString(),
     };
 
     guardarEvaluacion(nuevaEvaluacion);
     setResultadoFinal(nuevaEvaluacion);
   };
-
-  useEffect(() => {
-    if (!resultadoFinal) return;
-    if (!clausulaActiva) return;
-
-    const ingresoTotal = Number(resultadoFinal.promedioTitular) + Number(resultadoFinal.promedioAval);
-    const cumpleClausula = ingresoTotal >= resultadoFinal.montoRequeridoClausula;
-
-    const nuevoResultado = cumpleClausula
-      ? "APROBADO CON CLÁUSULA DE RIESGO"
-      : "NO CUMPLE NI CON CLÁUSULA DE RIESGO";
-
-    setResultadoFinal({
-      ...resultadoFinal,
-      resultado: nuevoResultado,
-      cumpleClausula,
-    });
-  }, [clausulaActiva]);
 
   const generarExcel = () => {
     const evaluaciones = obtenerEvaluaciones();
@@ -125,86 +134,56 @@ const LiquidacionForm = () => {
     XLSX.writeFile(wb, "Evaluaciones_Completas.xlsx");
   };
 
-  const generarPDF = (logoURL = null) => {
-    if (!resultadoFinal) return;
+  const generarPDF = () => {
+    const doc = new jsPDF();
+    let y = 10;
 
-    const doc = new jsPDF("p", "pt", "a4");
-    let y = 30;
+    doc.setFontSize(14);
+    doc.text("INFORME DE EVALUACIÓN - PLUS ULTRA", 10, y);
+    y += 10;
 
-    doc.setFillColor(0, 31, 84);
-    doc.rect(0, 0, 595, 60, "F");
+    Object.entries(resultadoFinal).forEach(([key, value]) => {
+      doc.setFontSize(10);
+      doc.text(`${key}: ${value}`, 10, y);
+      y += 7;
+    });
 
-    if (logoURL) doc.addImage(logoURL, "PNG", 520, 10, 50, 40);
+    doc.save(`Evaluacion_${rut}.pdf`);
+  };
 
-    doc.setFontSize(20);
-    doc.setTextColor(255, 204, 0);
-    doc.setFont("helvetica", "bold");
-    doc.text("INFORME DE EVALUACIÓN - PLUS ULTRA", 20, 40);
+  const respaldarJSON = () => {
+    const evaluaciones = obtenerEvaluaciones();
+    const json = JSON.stringify(evaluaciones, null, 2);
+    setJsonBackup(json);
 
-    y += 50;
+    const blob = new Blob([json], { type: "application/json" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "evaluaciones_backup.json";
+    link.click();
+  };
 
-    const startX = 20;
-    const startY = y;
-    const cellHeight = 18;
-    const col1Width = 180;
-    const col2Width = 370;
-
-    const agregarFila = (label, value, color = [0, 53, 102]) => {
-      doc.setFillColor(255, 255, 255);
-      doc.setDrawColor(0, 31, 84);
-      doc.rect(startX, y - 12, col1Width, cellHeight);
-      doc.rect(startX + col1Width, y - 12, col2Width, cellHeight);
-
-      doc.setFontSize(12);
-      doc.setTextColor(...color);
-      doc.setFont("helvetica", "bold");
-      doc.text(label, startX + 5, y);
-      doc.setFont("helvetica", "normal");
-      doc.text(value, startX + col1Width + 5, y);
-
-      y += cellHeight;
+  const restaurarJSONArchivo = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const jsonData = event.target.result;
+      localStorage.setItem("evaluaciones", jsonData);
+      const restauradas = JSON.parse(jsonData);
+      if (restauradas.length > 0) {
+        setResultadoFinal(restauradas[restauradas.length - 1]);
+      } else {
+        setResultadoFinal(null);
+      }
+      setJsonBackup(jsonData);
+      alert("✅ JSON restaurado en localStorage y pantalla actualizada");
     };
-
-    agregarFila("RUT:", resultadoFinal.rut);
-    agregarFila("Nombre Postulante:", resultadoFinal.postulante);
-    agregarFila("PID:", resultadoFinal.pid);
-    agregarFila("Dirección:", resultadoFinal.direccion);
-    agregarFila("Canon:", `$${resultadoFinal.canon}`);
-    agregarFila("Política aplicada:", resultadoFinal.multiplicadorNormal);
-
-    const promTitularStr = `${liq1} + ${liq2} + ${liq3} / 3 = ${resultadoFinal.promedioTitular}`;
-    agregarFila("Promedio Titular:", promTitularStr);
-
-    if (tieneAval) {
-      const promAvalStr = `${liqAval1} + ${liqAval2} + ${liqAval3} / 3 = ${resultadoFinal.promedioAval}`;
-      agregarFila("Promedio Aval:", promAvalStr);
-      agregarFila("Total Titular + Aval:", `${Number(resultadoFinal.promedioTitular) + Number(resultadoFinal.promedioAval)}`);
-      agregarFila("Aval RUT:", resultadoFinal.avalRut || "-");
-      agregarFila("Aval Nombre:", resultadoFinal.avalNombre || "-");
-    }
-
-    agregarFila("Monto requerido normal:", `$${resultadoFinal.montoRequeridoNormal}`);
-    agregarFila("Diferencia:", resultadoFinal.diferencia);
-
-    if (!resultadoFinal.cumpleNormal) {
-      agregarFila("Monto requerido cláusula:", `$${resultadoFinal.montoRequeridoClausula}`);
-    }
-
-    agregarFila("Ingresos declarados:", `$${tieneAval ? Number(resultadoFinal.promedioTitular) + Number(resultadoFinal.promedioAval) : Number(resultadoFinal.promedioTitular)}`);
-
-    const colorResultado = resultadoFinal.resultado.includes("APROBADO") ? [255, 204, 0] : [214, 40, 40];
-    agregarFila("Resultado final:", resultadoFinal.resultado, colorResultado);
-
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(0, 53, 102);
-    agregarFila("Fecha evaluación:", resultadoFinal.fecha);
-
-    doc.save(`Evaluacion_${resultadoFinal.rut}.pdf`);
+    reader.readAsText(file);
   };
 
   const nuevaEvaluacion = () => {
     setResultadoFinal(null);
-    setClausulaActiva(false);
   };
 
   if (resultadoFinal) {
@@ -215,46 +194,18 @@ const LiquidacionForm = () => {
           <p>Resultado de Evaluación</p>
         </div>
 
-        <p><strong>RUT:</strong> {resultadoFinal.rut}</p>
-        <p><strong>Nombre Postulante:</strong> {resultadoFinal.postulante}</p>
-        <p><strong>PID:</strong> {resultadoFinal.pid}</p>
-        <p><strong>Dirección:</strong> {resultadoFinal.direccion}</p>
-        <p><strong>Canon:</strong> ${resultadoFinal.canon}</p>
-        <p><strong>Política aplicada:</strong> {resultadoFinal.multiplicadorNormal}</p>
-        <p><strong>Monto requerido normal:</strong> ${resultadoFinal.montoRequeridoNormal}</p>
-        <p><strong>Diferencia:</strong> {resultadoFinal.diferencia}</p>
-
-        {!resultadoFinal.cumpleNormal && (
-          <>
-            <p><strong>Monto requerido cláusula:</strong> ${resultadoFinal.montoRequeridoClausula}</p>
-            {!clausulaActiva && (
-              <button onClick={() => setClausulaActiva(true)}>Activar Cláusula de Riesgo</button>
-            )}
-          </>
-        )}
-
-        <p><strong>Ingresos declarados:</strong> ${tieneAval ? Number(resultadoFinal.promedioTitular) + Number(resultadoFinal.promedioAval) : Number(resultadoFinal.promedioTitular)}</p>
-        {tieneAval && (
-          <>
-            <p><strong>Aval RUT:</strong> {resultadoFinal.avalRut}</p>
-            <p><strong>Aval Nombre:</strong> {resultadoFinal.avalNombre}</p>
-          </>
-        )}
-        <p><strong>Resultado final:</strong> {resultadoFinal.resultado}</p>
+        {Object.entries(resultadoFinal).map(([key, value]) => (
+          <p key={key}>
+            <strong>{key}:</strong> {value}
+          </p>
+        ))}
 
         <div className="button-group">
-          <button onClick={() => generarPDF()}>Descargar PDF</button>
+          <button onClick={generarPDF}>Descargar PDF</button>
           <button onClick={generarExcel}>Descargar Excel</button>
-          <button
-            onClick={() => {
-              localStorage.removeItem("evaluaciones");
-              alert("Se han borrado todas las evaluaciones");
-              window.location.reload();
-            }}
-          >
-            Borrar todas las evaluaciones
-          </button>
           <button onClick={nuevaEvaluacion}>Nueva Evaluación</button>
+          <button onClick={respaldarJSON}>Respaldar JSON</button>
+          <input type="file" accept=".json" onChange={restaurarJSONArchivo} />
         </div>
       </div>
     );
@@ -265,6 +216,12 @@ const LiquidacionForm = () => {
       <div className="hero-header">
         <h1>PLUS ULTRA</h1>
         <p>Evaluación de Postulante</p>
+      </div>
+
+      <div className="button-group" style={{ justifyContent: "flex-end", marginBottom: "10px" }}>
+        <button onClick={generarExcel}>Descargar Excel</button>
+        <button onClick={respaldarJSON}>Respaldar JSON</button>
+        <input type="file" accept=".json" onChange={restaurarJSONArchivo} />
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -297,10 +254,8 @@ const LiquidacionForm = () => {
         {tieneAval && (
           <>
             <h3>Aval</h3>
-            <div className="grid-2">
-              <input placeholder="RUT Aval" value={avalRut} onChange={e => setAvalRut(e.target.value)} />
-              <input placeholder="Nombre Aval" value={avalNombre} onChange={e => setAvalNombre(e.target.value)} />
-            </div>
+            <input placeholder="RUT Aval" value={rutAval} onChange={e => setRutAval(e.target.value)} />
+            <input placeholder="Nombre Aval" value={nombreAval} onChange={e => setNombreAval(e.target.value)} />
             <div className="grid-3">
               <input type="number" placeholder="Liquidación Aval 1" value={liqAval1} onChange={e => setLiqAval1(e.target.value)} />
               <input type="number" placeholder="Liquidación Aval 2" value={liqAval2} onChange={e => setLiqAval2(e.target.value)} />
@@ -318,3 +273,4 @@ const LiquidacionForm = () => {
 };
 
 export default LiquidacionForm;
+
