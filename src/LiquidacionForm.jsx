@@ -130,57 +130,93 @@ const LiquidacionForm = () => {
     const doc = new jsPDF("p", "mm", "a4");
     let y = 20;
 
-    const azul = "#001f54";
-    const amarillo = "#ffcc00";
-    const rojo = "#d62828";
+    const azul = [0, 31, 84];
+    const amarillo = [255, 204, 0];
+    const rojo = [214, 40, 40];
+    const verde = [0, 128, 0];
 
-    doc.setFillColor(azul);
+    const ingresoTotal =
+      Number(resultadoFinal.promedioTitular) +
+      Number(resultadoFinal.promedioAval || 0);
+
+    const operacionPromedioTitular = `(${liq1} + ${liq2} + ${liq3}) / 3 = ${resultadoFinal.promedioTitular}`;
+
+    const operacionPromedioAval = tieneAval
+      ? `(${liqAval1} + ${liqAval2} + ${liqAval3}) / 3 = ${resultadoFinal.promedioAval}`
+      : null;
+
+    let estadoTexto = resultadoFinal.evaluacion;
+    let colorEstado = rojo;
+
+    if (resultadoFinal.evaluacion === "APROBADO") {
+      estadoTexto = "APROBADO";
+      colorEstado = verde;
+    }
+
+    if (resultadoFinal.clausula === "Aprobado con cláusula de riesgo") {
+      estadoTexto = "APROBADO CON CLÁUSULA DE RIESGO";
+      colorEstado = amarillo;
+    }
+
+    doc.setFillColor(...azul);
     doc.rect(10, 10, 190, 20, "F");
-    doc.setTextColor(amarillo);
+
+    doc.setTextColor(...amarillo);
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("INFORME DE EVALUACIÓN - PLUS ULTRA", 15, 25);
+    doc.text("INFORME DE EVALUACIÓN - PLUS ULTRA", 15, 23);
 
-    // Espacio para logo
-    // doc.addImage(logoData, "PNG", 160, 12, 30, 16);
+    doc.rect(160, 12, 30, 16);
 
-    y += 15;
-    doc.setDrawColor(azul);
-    doc.setFillColor("#ffffff");
-    doc.rect(10, y, 190, 130, "FD");
+    y = 40;
 
-    y += 10;
-    doc.setFontSize(12);
-    doc.setTextColor(azul);
+    doc.setDrawColor(...azul);
+    doc.rect(10, y - 10, 190, 200);
 
-    const info = [
+    const filas = [
       ["RUT", resultadoFinal.rut],
       ["Postulante", resultadoFinal.postulante],
       ["Nombre Corredor", resultadoFinal.nombreCorredor],
       ["Dirección", resultadoFinal.direccion],
       ["PID", resultadoFinal.pid],
-      ["Canon", `$${resultadoFinal.canon}`],
+      ["Canon", `$${Number(resultadoFinal.canon).toLocaleString()}`],
       ["Política aplicada", resultadoFinal.multiplicadorNormal],
-      ["Monto requerido normal", `$${resultadoFinal.montoRequeridoNormal}`],
-      ["Diferencia", `${resultadoFinal.diferencia >=0 ? '+' : ''}$${resultadoFinal.diferencia}`],
-      ["Monto requerido cláusula", `$${resultadoFinal.montoRequeridoRiesgo}`],
-      ["Ingresos declarados", `$${resultadoFinal.promedioTitular}${tieneAval ? ' + ' + resultadoFinal.promedioAval : ''} = $${Number(resultadoFinal.promedioTitular)+Number(resultadoFinal.promedioAval)}`],
-      ["Resultado final", resultadoFinal.evaluacion],
-      ["Cláusula", resultadoFinal.clausula || "N/A"],
-      ["Nombre Aval", resultadoFinal.nombreAval],
-      ["RUT Aval", resultadoFinal.rutAval],
+      ["Monto requerido normal", `$${Number(resultadoFinal.montoRequeridoNormal).toLocaleString()}`],
+      ["Monto requerido cláusula", `$${Number(resultadoFinal.montoRequeridoRiesgo).toLocaleString()}`],
+      ["Ingresos declarados", `$${ingresoTotal.toLocaleString()}`],
+      ["Diferencia", `${resultadoFinal.diferencia >= 0 ? "+" : ""}$${Number(resultadoFinal.diferencia).toLocaleString()}`],
+      ["Resultado final", estadoTexto],
+      ["Nombre Aval", resultadoFinal.nombreAval || "N/A"],
+      ["RUT Aval", resultadoFinal.rutAval || "N/A"],
       ["Fecha", resultadoFinal.fecha],
     ];
 
-    info.forEach(([label, value]) => {
+    filas.forEach(([label, value]) => {
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(azul);
-      doc.text(`${label}:`, 15, y);
+      doc.setTextColor(...azul);
+      doc.text(label, 15, y);
+
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(rojo);
-      doc.text(`${value}`, 80, y);
+      doc.setTextColor(label === "Resultado final" ? colorEstado : [0,0,0]);
+      doc.text(String(value), 80, y);
       y += 8;
     });
+
+    y += 5;
+
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...azul);
+    doc.text("Detalle Cálculo Promedios:", 15, y);
+    y += 8;
+
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Titular: ${operacionPromedioTitular}`, 15, y);
+    y += 8;
+
+    if (operacionPromedioAval) {
+      doc.text(`Aval: ${operacionPromedioAval}`, 15, y);
+    }
 
     doc.save(`Evaluacion_${resultadoFinal.rut}.pdf`);
   };
