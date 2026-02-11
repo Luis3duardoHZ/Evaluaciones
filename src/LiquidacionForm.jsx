@@ -22,7 +22,6 @@ const LiquidacionForm = () => {
   const [rutAval, setRutAval] = useState("");
 
   const [resultadoFinal, setResultadoFinal] = useState(null);
-
   const [jsonBackup, setJsonBackup] = useState("");
 
   const obtenerEvaluaciones = () => {
@@ -51,14 +50,12 @@ const LiquidacionForm = () => {
       (Number(liq1) + Number(liq2) + Number(liq3)) / 3;
 
     let promedioAval = 0;
-
     if (tieneAval) {
       promedioAval =
         (Number(liqAval1) + Number(liqAval2) + Number(liqAval3)) / 3;
     }
 
     const ingresoTotal = promedioTitular + promedioAval;
-
     const ratioTitular = promedioTitular / Number(canon);
     const ratioTotal = ingresoTotal / Number(canon);
 
@@ -66,16 +63,13 @@ const LiquidacionForm = () => {
     let clausula = "";
     let multiplicadorNormal = 0;
     let multiplicadorRiesgo = 0;
-
     let cumpleNormal = false;
 
     if (!tieneAval) {
       multiplicadorNormal = 3;
       multiplicadorRiesgo = 2.5;
-
       evaluacion = ratioTitular >= multiplicadorNormal ? "APROBADO" : "RECHAZADO";
       cumpleNormal = ratioTitular >= multiplicadorNormal;
-
       clausula = cumpleNormal
         ? ""
         : ratioTitular >= multiplicadorRiesgo
@@ -84,10 +78,8 @@ const LiquidacionForm = () => {
     } else {
       multiplicadorNormal = 4;
       multiplicadorRiesgo = 3;
-
       evaluacion = ratioTotal >= multiplicadorNormal ? "APROBADO" : "RECHAZADO";
       cumpleNormal = ratioTotal >= multiplicadorNormal;
-
       clausula = cumpleNormal
         ? ""
         : ratioTotal >= multiplicadorRiesgo
@@ -135,20 +127,62 @@ const LiquidacionForm = () => {
   };
 
   const generarPDF = () => {
-    const doc = new jsPDF();
-    let y = 10;
+    const doc = new jsPDF("p", "mm", "a4");
+    let y = 20;
 
-    doc.setFontSize(14);
-    doc.text("INFORME DE EVALUACIÓN - PLUS ULTRA", 10, y);
+    const azul = "#001f54";
+    const amarillo = "#ffcc00";
+    const rojo = "#d62828";
+
+    doc.setFillColor(azul);
+    doc.rect(10, 10, 190, 20, "F");
+    doc.setTextColor(amarillo);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("INFORME DE EVALUACIÓN - PLUS ULTRA", 15, 25);
+
+    // Espacio para logo
+    // doc.addImage(logoData, "PNG", 160, 12, 30, 16);
+
+    y += 15;
+    doc.setDrawColor(azul);
+    doc.setFillColor("#ffffff");
+    doc.rect(10, y, 190, 130, "FD");
+
     y += 10;
+    doc.setFontSize(12);
+    doc.setTextColor(azul);
 
-    Object.entries(resultadoFinal).forEach(([key, value]) => {
-      doc.setFontSize(10);
-      doc.text(`${key}: ${value}`, 10, y);
-      y += 7;
+    const info = [
+      ["RUT", resultadoFinal.rut],
+      ["Postulante", resultadoFinal.postulante],
+      ["Nombre Corredor", resultadoFinal.nombreCorredor],
+      ["Dirección", resultadoFinal.direccion],
+      ["PID", resultadoFinal.pid],
+      ["Canon", `$${resultadoFinal.canon}`],
+      ["Política aplicada", resultadoFinal.multiplicadorNormal],
+      ["Monto requerido normal", `$${resultadoFinal.montoRequeridoNormal}`],
+      ["Diferencia", `${resultadoFinal.diferencia >=0 ? '+' : ''}$${resultadoFinal.diferencia}`],
+      ["Monto requerido cláusula", `$${resultadoFinal.montoRequeridoRiesgo}`],
+      ["Ingresos declarados", `$${resultadoFinal.promedioTitular}${tieneAval ? ' + ' + resultadoFinal.promedioAval : ''} = $${Number(resultadoFinal.promedioTitular)+Number(resultadoFinal.promedioAval)}`],
+      ["Resultado final", resultadoFinal.evaluacion],
+      ["Cláusula", resultadoFinal.clausula || "N/A"],
+      ["Nombre Aval", resultadoFinal.nombreAval],
+      ["RUT Aval", resultadoFinal.rutAval],
+      ["Fecha", resultadoFinal.fecha],
+    ];
+
+    info.forEach(([label, value]) => {
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(azul);
+      doc.text(`${label}:`, 15, y);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(rojo);
+      doc.text(`${value}`, 80, y);
+      y += 8;
     });
 
-    doc.save(`Evaluacion_${rut}.pdf`);
+    doc.save(`Evaluacion_${resultadoFinal.rut}.pdf`);
   };
 
   const respaldarJSON = () => {
@@ -182,9 +216,15 @@ const LiquidacionForm = () => {
     reader.readAsText(file);
   };
 
-  const nuevaEvaluacion = () => {
-    setResultadoFinal(null);
+  const borrarTodo = () => {
+    if (window.confirm("⚠️ ¿Seguro que quieres borrar todas las evaluaciones?")) {
+      localStorage.removeItem("evaluaciones");
+      setResultadoFinal(null);
+      alert("✅ Todas las evaluaciones han sido eliminadas");
+    }
   };
+
+  const nuevaEvaluacion = () => setResultadoFinal(null);
 
   if (resultadoFinal) {
     return (
@@ -195,9 +235,7 @@ const LiquidacionForm = () => {
         </div>
 
         {Object.entries(resultadoFinal).map(([key, value]) => (
-          <p key={key}>
-            <strong>{key}:</strong> {value}
-          </p>
+          <p key={key}><strong>{key}:</strong> {value}</p>
         ))}
 
         <div className="button-group">
@@ -206,6 +244,7 @@ const LiquidacionForm = () => {
           <button onClick={nuevaEvaluacion}>Nueva Evaluación</button>
           <button onClick={respaldarJSON}>Respaldar JSON</button>
           <input type="file" accept=".json" onChange={restaurarJSONArchivo} />
+          <button onClick={borrarTodo}>Borrar Todas las Evaluaciones</button>
         </div>
       </div>
     );
@@ -222,6 +261,7 @@ const LiquidacionForm = () => {
         <button onClick={generarExcel}>Descargar Excel</button>
         <button onClick={respaldarJSON}>Respaldar JSON</button>
         <input type="file" accept=".json" onChange={restaurarJSONArchivo} />
+        <button onClick={borrarTodo}>Borrar Todas las Evaluaciones</button>
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -273,4 +313,3 @@ const LiquidacionForm = () => {
 };
 
 export default LiquidacionForm;
-
