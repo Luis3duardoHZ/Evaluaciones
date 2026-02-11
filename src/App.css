@@ -1,0 +1,38 @@
+body {
+  background: #f4f4f4;
+}
+
+input, select {
+  padding: 5px;
+  margin: 5px;
+  width: 150px;
+}
+
+button {
+  padding: 8px 16px;
+  margin-top: 10px;
+  cursor: pointer;
+}
+
+h1 {
+  color: #333;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+
+table, th, td {
+  border: 1px solid #ccc;
+}
+
+th, td {
+  padding: 8px;
+  text-align: left;
+}
+
+th {
+  background: #eee;
+}
