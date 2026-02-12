@@ -60,27 +60,30 @@ const LiquidacionForm = () => {
     let clausula = "";
     let multiplicadorNormal = 0;
     let multiplicadorRiesgo = 0;
+    let cumpleNormal = false;
 
     if (!tieneAval) {
       multiplicadorNormal = 3;
       multiplicadorRiesgo = 2.5;
-      evaluacion = ratioTitular >= multiplicadorNormal ? "APROBADO" : "RECHAZADO";
-      clausula =
-        ratioTitular >= multiplicadorNormal
-          ? ""
-          : ratioTitular >= multiplicadorRiesgo
-          ? "Aprobado con cláusula de riesgo"
-          : "No cumple ni con cláusula de riesgo";
+      evaluacion =
+        ratioTitular >= multiplicadorNormal ? "APROBADO" : "RECHAZADO";
+      cumpleNormal = ratioTitular >= multiplicadorNormal;
+      clausula = cumpleNormal
+        ? ""
+        : ratioTitular >= multiplicadorRiesgo
+        ? "Aprobado con cláusula de riesgo"
+        : "No cumple ni con cláusula de riesgo";
     } else {
       multiplicadorNormal = 4;
       multiplicadorRiesgo = 3;
-      evaluacion = ratioTotal >= multiplicadorNormal ? "APROBADO" : "RECHAZADO";
-      clausula =
-        ratioTotal >= multiplicadorNormal
-          ? ""
-          : ratioTotal >= multiplicadorRiesgo
-          ? "Aprobado con cláusula de riesgo"
-          : "No cumple ni con cláusula de riesgo";
+      evaluacion =
+        ratioTotal >= multiplicadorNormal ? "APROBADO" : "RECHAZADO";
+      cumpleNormal = ratioTotal >= multiplicadorNormal;
+      clausula = cumpleNormal
+        ? ""
+        : ratioTotal >= multiplicadorRiesgo
+        ? "Aprobado con cláusula de riesgo"
+        : "No cumple ni con cláusula de riesgo";
     }
 
     const montoRequeridoNormal = canon * multiplicadorNormal;
@@ -123,74 +126,105 @@ const LiquidacionForm = () => {
   };
 
   const generarPDF = () => {
+    if (!resultadoFinal) return;
+
     const doc = new jsPDF("p", "mm", "a4");
     let y = 20;
 
-    const azul = [0, 31, 84];
-    const amarillo = [255, 204, 0];
-    const rojo = [214, 40, 40];
+    const ingresoTotal =
+      Number(resultadoFinal.promedioTitular) +
+      Number(resultadoFinal.promedioAval || 0);
 
-    doc.setFillColor(...azul);
+    doc.setFillColor(0, 31, 84);
     doc.rect(10, 10, 190, 20, "F");
 
-    doc.setTextColor(...amarillo);
+    doc.setTextColor(255, 204, 0);
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("INFORME DE EVALUACIÓN - PLUS ULTRA", 15, 25);
+    doc.text("INFORME DE EVALUACIÓN - PLUS ULTRA", 15, 23);
 
-    y += 20;
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(12);
+    doc.setDrawColor(255, 255, 255);
+    doc.rect(160, 12, 30, 16);
 
-    const estadoVisual =
-      resultadoFinal.evaluacion === "APROBADO"
-        ? "🟢 APROBADO"
-        : resultadoFinal.clausula === "Aprobado con cláusula de riesgo"
-        ? "🟡 APROBADO CON CLÁUSULA DE RIESGO"
-        : "🔴 RECHAZADO";
+    y = 45;
 
-    const observacion =
-      resultadoFinal.evaluacion === "APROBADO"
-        ? "Cumple con la política normal exigida."
-        : resultadoFinal.clausula === "Aprobado con cláusula de riesgo"
-        ? "El postulante no alcanza la política normal, pero cumple el monto exigido bajo cláusula de riesgo."
-        : "No cumple con los requisitos mínimos exigidos.";
+    doc.setFontSize(11);
 
-    const info = [
+    const filas = [
       ["RUT", resultadoFinal.rut],
       ["Postulante", resultadoFinal.postulante],
       ["Nombre Corredor", resultadoFinal.nombreCorredor],
       ["Dirección", resultadoFinal.direccion],
       ["PID", resultadoFinal.pid],
-      ["Canon", `$${resultadoFinal.canon}`],
-      ["Promedio Titular", `$${resultadoFinal.promedioTitular}`],
-      ["Promedio Aval", `$${resultadoFinal.promedioAval}`],
-      ["Monto requerido normal", `$${resultadoFinal.montoRequeridoNormal}`],
-      ["Monto requerido cláusula", `$${resultadoFinal.montoRequeridoRiesgo}`],
-      ["Diferencia", `$${resultadoFinal.diferencia}`],
+      ["Canon", `$${Number(resultadoFinal.canon).toLocaleString()}`],
+      ["Política aplicada", resultadoFinal.multiplicadorNormal],
+      ["Monto requerido normal", `$${Number(resultadoFinal.montoRequeridoNormal).toLocaleString()}`],
+      ["Monto requerido cláusula", `$${Number(resultadoFinal.montoRequeridoRiesgo).toLocaleString()}`],
+      ["Ingresos declarados", `$${ingresoTotal.toLocaleString()}`],
+      ["Diferencia", `${resultadoFinal.diferencia >= 0 ? "+" : ""}$${Number(resultadoFinal.diferencia).toLocaleString()}`],
+      ["Resultado final", resultadoFinal.clausula === "Aprobado con cláusula de riesgo"
+        ? "APROBADO CON CLÁUSULA DE RIESGO"
+        : resultadoFinal.evaluacion],
+      ["Nombre Aval", resultadoFinal.nombreAval || "N/A"],
+      ["RUT Aval", resultadoFinal.rutAval || "N/A"],
+      ["Fecha", resultadoFinal.fecha],
     ];
 
-    info.forEach(([label, value]) => {
+    filas.forEach(([label, value]) => {
+      doc.setTextColor(0, 31, 84);
       doc.setFont("helvetica", "bold");
-      doc.text(`${label}:`, 15, y);
+      doc.text(label + ":", 15, y);
+
       doc.setFont("helvetica", "normal");
-      doc.text(`${value}`, 80, y);
+
+      if (label === "Resultado final") {
+        if (value === "APROBADO") {
+          doc.setTextColor(0, 128, 0);
+        } else if (value === "APROBADO CON CLÁUSULA DE RIESGO") {
+          doc.setTextColor(255, 165, 0);
+        } else {
+          doc.setTextColor(214, 40, 40);
+        }
+      } else {
+        doc.setTextColor(0, 0, 0);
+      }
+
+      doc.text(String(value), 85, y);
       y += 8;
     });
 
-    y += 10;
-    doc.setTextColor(...rojo);
-    doc.setFont("helvetica", "bold");
-    doc.text("📊 RESULTADO", 15, y);
-    y += 8;
-
-    doc.setTextColor(0, 0, 0);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Estado: ${estadoVisual}`, 15, y);
-    y += 8;
-    doc.text(`Observación: ${observacion}`, 15, y);
-
     doc.save(`Evaluacion_${resultadoFinal.rut}.pdf`);
+  };
+
+  const respaldarJSON = () => {
+    const evaluaciones = obtenerEvaluaciones();
+    const json = JSON.stringify(evaluaciones, null, 2);
+    setJsonBackup(json);
+
+    const blob = new Blob([json], { type: "application/json" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "evaluaciones_backup.json";
+    link.click();
+  };
+
+  const restaurarJSONArchivo = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const jsonData = event.target.result;
+      localStorage.setItem("evaluaciones", jsonData);
+      const restauradas = JSON.parse(jsonData);
+      if (restauradas.length > 0) {
+        setResultadoFinal(restauradas[restauradas.length - 1]);
+      } else {
+        setResultadoFinal(null);
+      }
+      setJsonBackup(jsonData);
+      alert("✅ JSON restaurado correctamente");
+    };
+    reader.readAsText(file);
   };
 
   const borrarTodo = () => {
@@ -206,80 +240,64 @@ const LiquidacionForm = () => {
   if (resultadoFinal) {
     return (
       <div className="form-container">
-        <div className="hero-header">
-          <h1>PLUS ULTRA</h1>
-          <p>Resultado de Evaluación</p>
-        </div>
+        <h1>PLUS ULTRA</h1>
+        <h2>Resultado de Evaluación</h2>
 
         {Object.entries(resultadoFinal).map(([key, value]) => (
-          <p key={key}><strong>{key}:</strong> {value}</p>
+          <p key={key}>
+            <strong>{key}:</strong> {value}
+          </p>
         ))}
 
-        <div className="button-group">
-          <button onClick={generarPDF}>Descargar PDF</button>
-          <button onClick={generarExcel}>Descargar Excel</button>
-          <button onClick={nuevaEvaluacion}>Nueva Evaluación</button>
-          <button onClick={borrarTodo}>Borrar Todas las Evaluaciones</button>
-        </div>
+        <button onClick={generarPDF}>Descargar PDF</button>
+        <button onClick={generarExcel}>Descargar Excel</button>
+        <button onClick={nuevaEvaluacion}>Nueva Evaluación</button>
+        <button onClick={respaldarJSON}>Respaldar JSON</button>
+        <input type="file" accept=".json" onChange={restaurarJSONArchivo} />
+        <button onClick={borrarTodo}>Borrar Todas las Evaluaciones</button>
       </div>
     );
   }
 
   return (
     <div className="form-container">
-      <div className="hero-header">
-        <h1>PLUS ULTRA</h1>
-        <p>Evaluación de Postulante</p>
-      </div>
+      <h1>PLUS ULTRA</h1>
+      <h2>Evaluación de Postulante</h2>
 
-      <div className="button-group" style={{ justifyContent: "flex-end", marginBottom: "10px" }}>
-        <button onClick={generarExcel}>Descargar Excel</button>
-        <button onClick={borrarTodo}>Borrar Todas las Evaluaciones</button>
-      </div>
+      <button onClick={generarExcel}>Descargar Excel</button>
+      <button onClick={respaldarJSON}>Respaldar JSON</button>
+      <input type="file" accept=".json" onChange={restaurarJSONArchivo} />
+      <button onClick={borrarTodo}>Borrar Todas las Evaluaciones</button>
 
       <form onSubmit={handleSubmit}>
-        <div className="grid-2">
-          <input placeholder="RUT" value={rut} onChange={e => setRut(e.target.value)} required />
-          <input placeholder="Nombre Postulante" value={postulante} onChange={e => setPostulante(e.target.value)} required />
-        </div>
-
-        <input placeholder="Nombre Corredor" value={nombreCorredor} onChange={e => setNombreCorredor(e.target.value)} required />
-        <input placeholder="Dirección Unidad" value={direccion} onChange={e => setDireccion(e.target.value)} required />
-
-        <div className="grid-2">
-          <input placeholder="PID" value={pid} onChange={e => setPid(e.target.value)} required />
-          <input type="number" placeholder="Canon" value={canon} onChange={e => setCanon(e.target.value)} required />
-        </div>
+        <input placeholder="RUT" value={rut} onChange={(e) => setRut(e.target.value)} required />
+        <input placeholder="Nombre Postulante" value={postulante} onChange={(e) => setPostulante(e.target.value)} required />
+        <input placeholder="Nombre Corredor" value={nombreCorredor} onChange={(e) => setNombreCorredor(e.target.value)} required />
+        <input placeholder="Dirección Unidad" value={direccion} onChange={(e) => setDireccion(e.target.value)} required />
+        <input placeholder="PID" value={pid} onChange={(e) => setPid(e.target.value)} required />
+        <input type="number" placeholder="Canon" value={canon} onChange={(e) => setCanon(e.target.value)} required />
 
         <h3>Titular</h3>
-        <div className="grid-3">
-          <input type="number" placeholder="Liquidación 1" value={liq1} onChange={e => setLiq1(e.target.value)} required />
-          <input type="number" placeholder="Liquidación 2" value={liq2} onChange={e => setLiq2(e.target.value)} required />
-          <input type="number" placeholder="Liquidación 3" value={liq3} onChange={e => setLiq3(e.target.value)} required />
-        </div>
+        <input type="number" placeholder="Liquidación 1" value={liq1} onChange={(e) => setLiq1(e.target.value)} required />
+        <input type="number" placeholder="Liquidación 2" value={liq2} onChange={(e) => setLiq2(e.target.value)} required />
+        <input type="number" placeholder="Liquidación 3" value={liq3} onChange={(e) => setLiq3(e.target.value)} required />
 
-        <div className="button-group">
-          <button type="button" onClick={() => setTieneAval(!tieneAval)}>
-            {tieneAval ? "Desactivar Aval" : "Activar Aval"}
-          </button>
-        </div>
+        <button type="button" onClick={() => setTieneAval(!tieneAval)}>
+          {tieneAval ? "Desactivar Aval" : "Activar Aval"}
+        </button>
 
         {tieneAval && (
           <>
             <h3>Aval</h3>
-            <input placeholder="RUT Aval" value={rutAval} onChange={e => setRutAval(e.target.value)} />
-            <input placeholder="Nombre Aval" value={nombreAval} onChange={e => setNombreAval(e.target.value)} />
-            <div className="grid-3">
-              <input type="number" placeholder="Liquidación Aval 1" value={liqAval1} onChange={e => setLiqAval1(e.target.value)} />
-              <input type="number" placeholder="Liquidación Aval 2" value={liqAval2} onChange={e => setLiqAval2(e.target.value)} />
-              <input type="number" placeholder="Liquidación Aval 3" value={liqAval3} onChange={e => setLiqAval3(e.target.value)} />
-            </div>
+            <input placeholder="RUT Aval" value={rutAval} onChange={(e) => setRutAval(e.target.value)} />
+            <input placeholder="Nombre Aval" value={nombreAval} onChange={(e) => setNombreAval(e.target.value)} />
+            <input type="number" placeholder="Liquidación Aval 1" value={liqAval1} onChange={(e) => setLiqAval1(e.target.value)} />
+            <input type="number" placeholder="Liquidación Aval 2" value={liqAval2} onChange={(e) => setLiqAval2(e.target.value)} />
+            <input type="number" placeholder="Liquidación Aval 3" value={liqAval3} onChange={(e) => setLiqAval3(e.target.value)} />
           </>
         )}
 
-        <div className="button-group">
-          <button type="submit" className="primary-btn">Evaluar</button>
-        </div>
+        <button type="submit">Evaluar</button>
       </form>
     </div>
   );
